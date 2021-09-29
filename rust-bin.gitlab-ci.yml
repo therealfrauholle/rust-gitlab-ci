@@ -1,0 +1,255 @@
+stages:
+    - check
+    - build
+    - test
+    - release
+    - deploy
+
+workflow:
+    rules:
+        - if: $CI_PIPELINE_SOURCE != 'push' || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_TAG
+          when: always
+        - when: never
+
+.rust-default:
+    image: registry.gitlab.com/tobip64/rust-gitlasb-ci:latest
+    cache:
+        key: $CI_JOB_NAME
+        paths: [ target/ ]
+    interruptible: true
+    timeout: 30m
+    parallel:
+        matrix:
+            -   CHANNEL: [ +stable, +beta, +nightly ]
+    rules:
+        -   if: $CHANNEL == "+stable"
+            allow_failure: false
+        -   allow_failure: true
+    before_script:
+        - rustup --version && rustc --version && cargo --version && echo $RUSTFLAGS
+
+check:test:
+    extends: .rust-default
+    stage: check
+    script:
+        - cargo $CHANNEL test --verbose --all-features --no-fail-fast -- -Z unstable-options --format json | gitlab-report -p test > results.xml
+    after_script:
+        - mkdir results/
+        - cp results.xml results/results.xml
+        - allure generate -c results/
+    artifacts:
+        when: always
+        paths:
+            - allure-report/
+        reports:
+            junit:
+                - results.xml
+
+check:bench:
+    extends: .rust-default
+    stage: check
+    script:
+        - cargo $CHANNEL bench --verbose -- -Z unstable-options --format json | gitlab-report -p bench > metrics.txt
+    artifacts:
+        when: always
+        reports:
+            metrics: metrics.txt
+
+check:clippy:
+    extends: .rust-default
+    stage: check
+    script:
+        - cargo $CHANNEL clippy --verbose --all-targets --all-features --message-format=json | gitlab-report -p clippy > gl-code-quality-report.json
+    artifacts:
+        when: always
+        reports:
+            codequality: gl-code-quality-report.json
+
+check:fmt:
+    extends: .rust-default
+    stage: check
+    parallel:
+    rules:
+        -   if: $RUN_RUST_FMT
+    script:
+        - cargo +stable fmt -- --check
+    allow_failure: true
+
+check:audit:
+    extends: .rust-default
+    stage: check
+    parallel:
+    script:
+        - cargo audit | gitlab-report -p audit > gl-sast-report.json
+    artifacts:
+        when: always
+        reports:
+            sast: gl-sast-report.json
+
+build:
+    extends: .rust-default
+    stage: build
+    needs: [ "check:test", "check:clippy", "check:audit" ]
+    timeout: 1h
+    variables:
+        RUSTFLAGS: "-Clinker=rust-lld"
+    parallel:
+        matrix:
+            -   CHANNEL: [ +stable, +beta, +nightly ]
+                PROFILE: [ debug, release ]
+                PACKAGE: []
+                TARGET:
+                    - x86_64-unknown-linux-musl
+                    - aarch64-unknown-linux-musl
+                    - wasm32-wasi
+    script:
+        - cargo $CHANNEL build --target $TARGET --package $PACKAGE $([[ $PROFILE == "release" ]] && echo "--release" || echo "") --verbose
+    artifacts:
+        paths:
+            - target/$TARGET/$PROFILE/$PACKAGE
+            - Dockerfile
+
+.build:multiarch:
+    extends: .rust-default
+    stage: build
+    needs: [ "check:test", "check:clippy", "check:audit" ]
+    timeout: 1h
+    variables:
+        RUSTFLAGS: "-Clinker=rust-lld"
+    parallel:
+            matrix:
+                -   CHANNEL: [ +nightly ]
+                    PROFILE: [ debug, release ]
+                    PACKAGE: []
+    script:
+        - 'cargo $CHANNEL build
+            $([[ $PROFILE == "release" ]] && echo "--release" || echo "")
+            --package $PACKAGE
+            --target x86_64-unknown-linux-musl
+            --target powerpc64le-unknown-linux-musl
+            --target aarch64-unknown-linux-musl
+            --target riscv64gc-unknown-linux-musl
+            --target wasm32-wasi
+            --verbose
+            -Z multitarget
+            -Z build-std'
+    artifacts:
+        paths:
+            - target/*/$PROFILE/$PACKAGE
+            - Dockerfile
+
+build:docs:
+    extends: .rust-default
+    stage: build
+    needs: [ "check:test", "check:clippy", "check:audit" ]
+    parallel:
+    script:
+        - cargo +stable doc --no-deps
+    artifacts:
+        paths:
+            - target/doc
+
+test:
+    extends: .rust-default
+    stage: test
+    needs: [ build ]
+    parallel:
+        matrix:
+            -   CHANNEL: [ +stable, +beta, +nightly ]
+                PROFILE: [ debug, release ]
+                PACKAGE: []
+    script:
+        - echo test
+
+release:registry:
+    stage: release
+    image: curlimages/curl:latest
+    needs: [ build ]
+    timeout: 5m
+    parallel:
+        matrix:
+            -   CHANNEL: [ stable, beta, nightly ]
+                PROFILE: [ debug, release ]
+                PACKAGE: []
+                TARGET:
+                    - x86_64-unknown-linux-gnu
+                    - aarch64-unknown-linux-gnu
+                    - wasm32-wasi
+    variables:
+        GIT_STRATEGY: none
+    script:
+        - 'curl
+          --header "JOB-TOKEN: $CI_JOB_TOKEN"
+          --upload-file $CI_PROJECT_DIR/target/$PROFILE/$TARGET/$PACKAGE
+          $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$CI_COMMIT_REF_SLUG/$CI_COMMIT_SHA/$CHANNEL-$TARGET-$PACKAGE'
+
+release:docker:
+    image: docker:20.10.6
+    stage: release
+    needs: [ build ]
+    services:
+        -   name: docker:20.10.6-dind
+            entrypoint: [ "env", "-u", "DOCKER_HOST" ]
+            command: [ "dockerd-entrypoint.sh" ]
+    variables:
+        GIT_STRATEGY: none
+        DOCKER_HOST: tcp://docker:2375/
+        DOCKER_DRIVER: overlay2
+        DOCKER_TLS_CERTDIR: ""
+        DOCKER_PLATFORM: "linux/amd64,linux/arm64/v8"
+    parallel:
+        matrix:
+            -   CHANNEL: [ stable, beta, nightly ]
+                PROFILE: [ debug, release ]
+    script:
+        - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+        - docker buildx create --name builder
+        - docker buildx use builder
+        - 'docker buildx build
+          -f Dockerfile
+          --platform $DOCKER_PLATFORM
+          --build-arg CHANNEL=$CHANNEL
+          --build-arg PROFILE=$PROFILE
+          --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHA-$CHANNEL-$PROFILE
+          --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CHANNEL-$PROFILE-latest
+          .'
+        - docker push --all-tags $CI_REGISTRY_IMAGE
+
+release:pages:
+    stage: release
+    image: alpine:latest
+    needs: [ "build:docs" ]
+    variables:
+        GIT_STRATEGY: none
+    rules:
+        -   if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_TAG
+    script:
+        - mv target/doc public/
+        - echo '<meta http-equiv="refresh" content="0; url={{ LIBRARY NAME }}">' > public/index.html
+    artifacts:
+        paths:
+            - public/
+
+release:gitlab:
+    stage: release
+    image: registry.gitlab.com/gitlab-org/release-cli:latest
+    needs: [ build ]
+    variables:
+        GIT_STRATEGY: none
+    rules:
+        -   if: $CI_COMMIT_TAG
+            when: manual
+    script:
+        - release-cli create
+            --name $CI_COMMIT_TAG
+            --description $CI_COMMIT_MESSAGE
+            --tag-name $CI_COMMIT_TAG
+            --ref $CI_COMMIT_SHA
+            --assets-link '{"name":"Package","url":"${CI_REPOSITORY_URL}/packages/generic/${CI_COMMIT_REF_SLUG}/${CI_COMMIT_SHA}","link_type":"package"}'
+            --assets-link '{"name":"Docker Image","url":"$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG-$CI_COMMIT_SHA-stable-release","link_type":"image"}'
+            --assets-link '{"name":"Docs","url":"$CI_PAGES_URL"}'
+    release:
+        name: $CI_COMMIT_TAG
+        description: './CHANGELOG.md'
+        tag_name: $CI_COMMIT_TAG
+        ref: $CI_COMMIT_SHA
