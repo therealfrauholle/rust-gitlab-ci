@@ -1,6 +1,6 @@
 [package]
 name        = "gitlab-report"
-version     = "0.1.0"
+version     = "0.1.2"
 authors     = ["Tobias Pfeiffer <tobias@tobiaspfeiffer.net>"]
 edition     = "2018"
 repository  = "https://gitlab.com/TobiP64/rust-gitlab-ci"
@@ -9,7 +9,8 @@ description = "Generates GitLab reports from cargo's JSON output"
 readme      = "./README.md"
 
 [dependencies]
-serde      = { version = "^1.0", features = ["derive"] }
-serde_json = "^1.0"
-quick-xml  = { version = "0.22.0", features = ["serialize"] }
-chrono     = "^0.4"
+serde       = { version = "^1.0", features = ["derive"] }
+serde_json  = "^1.0"
+quick-xml   = { version = "0.22.0", features = ["serialize"] }
+chrono      = "^0.4"
+xxhash-rust = { version = "^0.8", features = ["xxh3"] }

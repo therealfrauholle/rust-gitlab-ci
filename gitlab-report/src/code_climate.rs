@@ -41,7 +41,8 @@ pub struct CodeQualityReportIssue {
 	pub location:           CodeQualityReportLocation,
 	pub other_locations:    Option<Vec<CodeQualityReportLocation>>,
 	pub remediation_points: Option<usize>,
-	pub severity:           Option<CodeQualityReportIssueSeverity>
+	pub severity:           Option<CodeQualityReportIssueSeverity>,
+	pub fingerprint:        Option<String>
 }
 
 #[derive(Clone, Debug, Serialize)]

@@ -10,12 +10,16 @@ workflow:
         -   when: never
 
 .rust-default:
-    image: registry.gitlab.com/tobip64/rust-gitlasb-ci:latest
+    image: registry.gitlab.com/tobip64/rust-gitlab-ci:latest
     cache:
-        key: $CI_JOB_NAME
-        paths: [ target/ ]
+        -   key: $CI_COMMIT_REF
+            paths: [ target/ ]
+        -   key: cargo
+            paths: [ cargo/ ]
     interruptible: true
     timeout: 30m
+    variables:
+        CARGO_HOME: $CI_PROJECT_DIR/cargo
     parallel:
         matrix:
             -   CHANNEL: [ +stable, +beta, +nightly ]
@@ -131,3 +135,15 @@ release:gitlab:
         description: './CHANGELOG.md'
         tag_name: $CI_COMMIT_TAG
         ref: $CI_COMMIT_SHA
+
+release:crates:
+    image: registry.gitlab.com/tobip64/rust-gitlab-ci:latest
+    stage: release
+    needs: [ "check:clippy", "check:test" ]
+    rules:
+        -   if: $CI_COMMIT_TAG
+            when: manual
+    before_script:
+        - rustup --version && rustc --version && cargo --version && echo $RUSTFLAGS
+    script:
+        - cargo publish --registry $CARGO_REGISTRY --token $CARGO_REGISTRY_TOKEN

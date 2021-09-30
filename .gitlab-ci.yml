@@ -1,5 +1,6 @@
 stages:
     - build
+    - check
 
 docker:
     image: docker:latest
@@ -16,3 +17,23 @@ docker:
         - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
         - docker build -t $CI_REGISTRY_IMAGE:latest -f Dockerfile .
         - docker push $CI_REGISTRY_IMAGE:latest
+    rules:
+        -   changes:
+                - Dockerfile
+
+clippy:
+    image: registry.gitlab.com/tobip64/rust-gitlab-ci:latest
+    stage: check
+    interruptible: true
+    timeout: 15m
+    parallel:
+        matrix:
+            -   CHANNEL: [ +stable, +beta, +nightly ]
+    rules:
+        -   if: $CHANNEL == "+stable"
+            allow_failure: false
+        -   allow_failure: true
+    before_script:
+        - rustup --version && rustc --version && cargo --version && echo $RUSTFLAGS
+    script:
+        - cargo $CHANNEL clippy --verbose --all-targets --all-features

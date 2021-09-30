@@ -10,14 +10,15 @@ RUN apk add --no-cache libgcc gcc pkgconf libc-dev openssl-dev zlib-dev libssh2-
 	cargo install gitlab-report cargo-audit cargo-binutils wasm-bindgen-cli
 
 FROM alpine:latest
-ENV RUSTFLAGS="-Clinker=rust-lld" \
+ENV RUSTFLAGS="-Clinker=rust-lld -Clink-arg=-L/usr/lib" \
 	RUSTUP_HOME=/usr/local/rustup \
 	CARGO_HOME=/usr/local/cargo \
 	PATH=/usr/local/cargo/bin:$PATH
 COPY --from=build /usr/local/cargo/bin /usr/local/cargo/bin
-RUN apk add --no-cache libgcc openssl && \
+RUN apk add --no-cache musl-dev libgcc openssl && \
 	wget -qO- https://sh.rustup.rs > rustup-init.sh && \
 	chmod +x ./rustup-init.sh && \
 	./rustup-init.sh -y --profile minimal --default-toolchain nightly --no-modify-path --component clippy rust-src rustfmt llvm-tools-preview --verbose && \
 	rustup component remove rust-std && \
+    ln -s /usr/lib/libgcc_s.so.1 /usr/lib/libgcc_s.so && \
 	rm -rf /usr/local/rustup/toolchains/nightly-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/bin/gcc-ld

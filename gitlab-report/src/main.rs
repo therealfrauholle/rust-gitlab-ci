@@ -20,7 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#![feature(stdio_locked)]
 #![forbid(unsafe_code)]
 #![warn(clippy::all)]
 #![allow(dead_code, clippy::from_over_into)]
@@ -131,7 +130,7 @@ fn main() {
 				 std::process::exit(1);
 			 }
 		 }),
-		None => Box::new(io::stdin_locked())
+		None => Box::new(io::stdin())
 	};
 	
 	let writer: Box<dyn io::Write> = match file_out {
@@ -147,7 +146,7 @@ fn main() {
 				 std::process::exit(1);
 			 }
 		 }),
-		None => Box::new(io::stdout_locked())
+		None => Box::new(io::stdout())
 	};
 	
 	let reader = io::BufReader::new(reader);
@@ -303,6 +302,8 @@ fn generate_clippy_to_code_quality(
 	reader: impl io::BufRead,
 	mut writer: impl io::Write
 ) {
+	let mut issues = Vec::new();
+	
 	for line in reader.lines() {
 		let msg = match line.and_then(|line| serde_json::from_str(&line)
 			.map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e)))
@@ -319,7 +320,7 @@ fn generate_clippy_to_code_quality(
 			_ => continue
 		};
 		
-		let r = serde_json::to_writer(&mut writer, &CodeQualityReportIssue {
+		issues.push(CodeQualityReportIssue {
 			r#type:             CODE_QUALITY_REPORT_TYPE,
 			check_name:         msg.message.code.as_ref().unwrap().code.clone(),
 			description:        msg.message.message.clone(),
@@ -335,18 +336,17 @@ fn generate_clippy_to_code_quality(
 				"error"   => CodeQualityReportIssueSeverity::Major,
 				"warning" => CodeQualityReportIssueSeverity::Minor,
 				_         => CodeQualityReportIssueSeverity::Info
-			})
+			}),
+			fingerprint:        Some(format!("{:x}", xxhash_rust::xxh3::xxh3_128(msg.message.message.as_bytes())))
 		});
-		
-		writer.write_all(b"\n").unwrap_or(());
-		
-		if let Err(e) = r {
-			eprintln!("error: failed to generate report: {}", e);
-			std::process::exit(1);
-		}
 	}
 	
 	eprintln!("  \x1b[32;1mGenerating\x1b[0m code quality report");
+	
+	if let Err(e) = serde_json::to_writer(&mut writer, &issues) {
+		eprintln!("error: failed to generate report: {}", e);
+		std::process::exit(1);
+	}
 }
 
 fn generate_clippy_to_open_metrics(
