@@ -84,8 +84,6 @@ build:
     stage: build
     needs: [ "check:clippy" ]
     timeout: 1h
-    variables:
-        RUSTFLAGS: "$RUSTFLAGS -Zinstrument-coverage"
     parallel:
         matrix:
             -   CHANNEL: [ +stable, +beta, +nightly ]
@@ -95,6 +93,7 @@ build:
                     - aarch64-unknown-linux-musl
                     - wasm32-wasi
     script:
+        - '[[ $CHANNEL == "+nightly" ]] && export RUSTFLAGS="$RUSTFLAGS -Zinstrument-coverage" || true'
         - 'cargo $CHANNEL build
             --verbose
             --color always
@@ -102,7 +101,6 @@ build:
             --all-targets
             --all-features
             --target $TARGET
-            --package $PACKAGE
             $([[ $PROFILE == "release" ]] && echo "--release" || echo "")'
     artifacts:
         paths:
