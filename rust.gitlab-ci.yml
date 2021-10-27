@@ -23,9 +23,9 @@ workflow:
         CARGO_HOME: $CI_PROJECT_DIR/cargo
     parallel:
         matrix:
-            -   CHANNEL: [ +stable, +beta, +nightly ]
+            -   CHANNEL: [ stable, beta, nightly ]
     rules:
-        -   if: $CHANNEL == "+stable"
+        -   if: $CHANNEL == "stable"
             allow_failure: false
         -   allow_failure: true
     before_script:
@@ -35,7 +35,7 @@ check:clippy:
     extends: .rust-default
     stage: check
     script:
-        - 'cargo $CHANNEL clippy
+        - 'cargo +$CHANNEL clippy
             --color always
             --verbose
             --all-targets
@@ -86,27 +86,27 @@ build:
     timeout: 1h
     parallel:
         matrix:
-            -   CHANNEL: [ +stable, +beta, +nightly ]
+            -   CHANNEL: [ stable, beta, nightly ]
                 PROFILE: [ debug, release ]
                 TARGET:
                     - x86_64-unknown-linux-musl
                     - aarch64-unknown-linux-musl
                     - wasm32-wasi
     script:
-        - '[[ $CHANNEL == "+nightly" ]] && export RUSTFLAGS="$RUSTFLAGS -Zinstrument-coverage" || true'
-        - 'cargo $CHANNEL build
+        - ln -sf /usr/local/rustup/toolchains/$CHANNEL-x86_64-unknown-linux-musl/lib/rustlib/$TARGET/lib/self-contained/* /usr/lib/
+        - '[[ $CHANNEL == "nightly" ]] && export RUSTFLAGS="$RUSTFLAGS -Zinstrument-coverage" || true'
+        - 'cargo +$CHANNEL build
             --verbose
             --color always
             --workspace
             --all-targets
             --all-features
             --target $TARGET
-            $([[ $PROFILE == "release" ]] && echo "--release" || echo "")'
+            $([[ $PROFILE == "release" ]] && echo "--release" || echo "")
+            $CARGO_OPTS'
     artifacts:
         paths:
-            - target/$TARGET/$PROFILE/$PACKAGE
-            - target/$TARGET/$PROFILE/lib${PACKAGE}.rlib
-            - target/$TARGET/$PROFILE/lib${PACKAGE}.so
+            - target/
             - Dockerfile
 
 # requires nightly
@@ -115,14 +115,13 @@ build:
     stage: build
     needs: [ "check:clippy" ]
     timeout: 1h
-    variables:
-        RUSTFLAGS: "$RUSTFLAGS -Zinstrument-coverage"
     parallel:
             matrix:
-                -   CHANNEL: [ +nightly ]
+                -   CHANNEL: [ nightly ]
                     PROFILE: [ debug, release ]
     script:
-        - 'cargo $CHANNEL build
+        - export RUSTFLAGS="$RUSTFLAGS -Zinstrument-coverage"
+        - 'cargo +$CHANNEL build
             --verbose
             --color=always
             --workspace
@@ -135,12 +134,11 @@ build:
             --target riscv64gc-unknown-linux-musl
             --target wasm32-wasi
             -Z multitarget
-            -Z build-std'
+            -Z build-std
+            $CARGO_OPTS'
     artifacts:
         paths:
-            - target/*/$PROFILE/$PACKAGE
-            - target/*/$PROFILE/lib${PACKAGE}.rlib
-            - target/*/$PROFILE/lib${PACKAGE}.so
+            - target/
             - Dockerfile
 
 build:docs:
@@ -159,7 +157,7 @@ test:test:
     stage: test
     needs: [ build ]
     script:
-        - 'LLVM_PROFILE_FILE="$CI_PROJECT_NAME-%p-%m.profraw" cargo $CHANNEL test
+        - 'LLVM_PROFILE_FILE="$CI_PROJECT_NAME-%p-%m.profraw" cargo +$CHANNEL test
             --verbose
             --color always
             --workspace
@@ -195,7 +193,7 @@ test:bench:
     stage: test
     needs: [ build ]
     script:
-        - 'cargo $CHANNEL bench
+        - 'cargo +$CHANNEL bench
             --verbose
             --color always
             --workspace

@@ -8,9 +8,11 @@ RUN apk add --no-cache libgcc clang pkgconf libc-dev openssl-dev zlib-dev libssh
 	wget -qO- https://sh.rustup.rs > rustup-init.sh && \
 	chmod +x ./rustup-init.sh && \
 	./rustup-init.sh -y --verbose  --no-modify-path --default-toolchain stable --profile minimal --component llvm-tools-preview && \
-    ln -s /usr/lib/libgcc_s.so.1 /usr/lib/libgcc_s.so && \
-	ln -s /usr/bin/clang /usr/bin/cc && \
-	ln -s /usr/local/rustup/toolchains/stable-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/bin/llvm-ar /usr/bin/ar && \
+    ln -sf /usr/lib/libgcc_s.so.1 /usr/lib/libgcc_s.so && \
+	ln -sf /usr/bin/clang /usr/bin/cc && \
+    ln -sf /usr/local/rustup/toolchains/stable-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/bin/rust-lld /usr/bin/ld && \
+	ln -sf /usr/local/rustup/toolchains/stable-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/bin/llvm-ar /usr/bin/ar && \
+	ln -sf /usr/local/rustup/toolchains/stable-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/lib/self-contained/* /usr/lib/ && \
 	cargo install --color=always gitlab-report grcov wasm-bindgen-cli cargo-audit cargo-binutils cargo-expand
 #	cargo install --color=always gitlab-report grcov wasm-bindgen-cli cargo-audit cargo-geiger cargo-binutils cargo-expand
 
@@ -37,10 +39,12 @@ RUN apk add --no-cache musl-dev libgcc openssl curl clang openjdk11-jre-headless
     		rustup --verbose component remove rust-std; \
     	fi \
     } && \
-    ln -s /usr/lib/libgcc_s.so.1 /usr/lib/libgcc_s.so && \
-	ln -s /usr/bin/clang /usr/bin/cc && \
-    ln -s /usr/local/rustup/toolchains/stable-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/bin/llvm-ar /usr/bin/ar && \
-	rm -rf /usr/local/rustup/toolchains/nightly-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/bin/gcc-ld && \
+    ln -sf /usr/lib/libgcc_s.so.1 /usr/lib/libgcc_s.so && \
+	ln -sf /usr/bin/clang /usr/bin/cc && \
+    ln -sf /usr/local/rustup/toolchains/stable-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/bin/rust-lld /usr/bin/ld && \
+    ln -sf /usr/local/rustup/toolchains/stable-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/bin/llvm-ar /usr/bin/ar && \
+    ln -sf /usr/local/rustup/toolchains/stable-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/lib/self-contained/* /usr/lib/ && \
+	rm -rf /usr/local/rustup/toolchains/*-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/bin/gcc-ld && \
     rm -rf /usr/lib/jvm/java-11-openjdk/legal && \
 	wget -qO- https://repo.maven.apache.org/maven2/io/qameta/allure/allure-commandline/$ALLURE_VERSION/allure-commandline-$ALLURE_VERSION.tgz | tar -xz && \
 	mv allure-$ALLURE_VERSION /allure
