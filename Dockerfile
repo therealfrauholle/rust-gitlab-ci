@@ -11,7 +11,7 @@ RUN apk add --no-cache libgcc clang pkgconf libc-dev openssl-dev zlib-dev libssh
     ln -s /usr/lib/libgcc_s.so.1 /usr/lib/libgcc_s.so && \
 	ln -s /usr/bin/clang /usr/bin/cc && \
 	ln -s /usr/local/rustup/toolchains/stable-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/bin/llvm-ar /usr/bin/ar && \
-	cargo install --color=always gitlab-report grcov wasm-bindgen-cli cargo-audit cargo-binutils cargo-expand+
+	cargo install --color=always gitlab-report grcov wasm-bindgen-cli cargo-audit cargo-binutils cargo-expand
 #	cargo install --color=always gitlab-report grcov wasm-bindgen-cli cargo-audit cargo-geiger cargo-binutils cargo-expand
 
 FROM alpine:latest
