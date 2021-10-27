@@ -6,9 +6,9 @@ stages:
 
 workflow:
     rules:
-        - if: $CI_PIPELINE_SOURCE != 'push' || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_TAG
-          when: always
-        - when: never
+        -   if: $CI_PIPELINE_SOURCE != 'push' || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_TAG
+            when: always
+        -   when: never
 
 .rust-default:
     image: registry.gitlab.com/tobip64/rust-gitlab-ci:latest
@@ -31,38 +31,17 @@ workflow:
     before_script:
         - rustup --version && rustc --version && cargo --version && echo $RUSTFLAGS
 
-check:test:
-    extends: .rust-default
-    stage: check
-    script:
-        - cargo $CHANNEL test --verbose --all-features --no-fail-fast -- -Z unstable-options --format json | gitlab-report -p test > results.xml
-    after_script:
-        - mkdir results/
-        - cp results.xml results/results.xml
-        - allure generate -c results/
-    artifacts:
-        when: always
-        paths:
-            - allure-report/
-        reports:
-            junit:
-                - results.xml
-
-check:bench:
-    extends: .rust-default
-    stage: check
-    script:
-        - cargo $CHANNEL bench --verbose -- -Z unstable-options --format json | gitlab-report -p bench > metrics.txt
-    artifacts:
-        when: always
-        reports:
-            metrics: metrics.txt
-
 check:clippy:
     extends: .rust-default
     stage: check
     script:
-        - cargo $CHANNEL clippy --verbose --all-targets --all-features --message-format=json | gitlab-report -p clippy > gl-code-quality-report.json
+        - 'cargo $CHANNEL clippy
+            --color always
+            --verbose
+            --all-targets
+            --all-features
+            --message-format=json
+            | gitlab-report -p clippy > gl-code-quality-report.json'
     artifacts:
         when: always
         reports:
@@ -83,7 +62,18 @@ check:audit:
     stage: check
     parallel:
     script:
-        - cargo audit | gitlab-report -p audit > gl-sast-report.json
+        - cargo audit --color=always --json | gitlab-report -p audit -f gl-sast > gl-sast-report.json
+    artifacts:
+        when: always
+        reports:
+            sast: gl-sast-report.json
+
+check:geiger:
+    extends: .rust-default
+    stage: check
+    parallel:
+    script:
+        - cargo geiger --all-dependencies --color always --output-format Json | gitlab-report -p geiger -f gl-sast > gl-sast-report.json
     artifacts:
         when: always
         reports:
@@ -92,100 +82,174 @@ check:audit:
 build:
     extends: .rust-default
     stage: build
-    needs: [ "check:test", "check:clippy", "check:audit" ]
+    needs: [ "check:clippy" ]
     timeout: 1h
+    variables:
+        RUSTFLAGS: "$RUSTFLAGS -Zinstrument-coverage"
     parallel:
         matrix:
             -   CHANNEL: [ +stable, +beta, +nightly ]
                 PROFILE: [ debug, release ]
-                PACKAGE: []
                 TARGET:
                     - x86_64-unknown-linux-musl
                     - aarch64-unknown-linux-musl
                     - wasm32-wasi
     script:
-        - cargo $CHANNEL build --target $TARGET --package $PACKAGE $([[ $PROFILE == "release" ]] && echo "--release" || echo "") --verbose
+        - 'cargo $CHANNEL build
+            --verbose
+            --color always
+            --workspace
+            --all-targets
+            --all-features
+            --target $TARGET
+            --package $PACKAGE
+            $([[ $PROFILE == "release" ]] && echo "--release" || echo "")'
     artifacts:
         paths:
             - target/$TARGET/$PROFILE/$PACKAGE
+            - target/$TARGET/$PROFILE/lib${PACKAGE}.rlib
+            - target/$TARGET/$PROFILE/lib${PACKAGE}.so
             - Dockerfile
 
+# requires nightly
 .build:multiarch:
     extends: .rust-default
     stage: build
-    needs: [ "check:test", "check:clippy", "check:audit" ]
+    needs: [ "check:clippy" ]
     timeout: 1h
+    variables:
+        RUSTFLAGS: "$RUSTFLAGS -Zinstrument-coverage"
     parallel:
             matrix:
                 -   CHANNEL: [ +nightly ]
                     PROFILE: [ debug, release ]
-                    PACKAGE: []
     script:
         - 'cargo $CHANNEL build
+            --verbose
+            --color=always
+            --workspace
+            --all-targets
+            --all-features
             $([[ $PROFILE == "release" ]] && echo "--release" || echo "")
-            --package $PACKAGE
             --target x86_64-unknown-linux-musl
             --target powerpc64le-unknown-linux-musl
             --target aarch64-unknown-linux-musl
             --target riscv64gc-unknown-linux-musl
             --target wasm32-wasi
-            --verbose
             -Z multitarget
             -Z build-std'
     artifacts:
         paths:
             - target/*/$PROFILE/$PACKAGE
+            - target/*/$PROFILE/lib${PACKAGE}.rlib
+            - target/*/$PROFILE/lib${PACKAGE}.so
             - Dockerfile
 
 build:docs:
     extends: .rust-default
     stage: build
-    needs: [ "check:test", "check:clippy", "check:audit" ]
+    needs: [ "check:clippy" ]
     parallel:
     script:
-        - cargo +stable doc --no-deps
+        - cargo +stable doc --color=always --verbose --no-deps
     artifacts:
         paths:
             - target/doc
 
-test:
+test:test:
     extends: .rust-default
     stage: test
     needs: [ build ]
-    parallel:
-        matrix:
-            -   CHANNEL: [ +stable, +beta, +nightly ]
-                PROFILE: [ debug, release ]
-                PACKAGE: []
+    script:
+        - 'LLVM_PROFILE_FILE="$CI_PROJECT_NAME-%p-%m.profraw" cargo $CHANNEL test
+            --verbose
+            --color always
+            --workspace
+            --all-targets
+            --all-features
+            --no-fail-fast
+            --
+            -Z unstable-options
+            --format json
+            | gitlab-report -p test > results.xml'
+    after_script:
+        - 'grcov .
+            --binary-path ./target/x86_64-unknown-linux-musl/debug/
+            --source-dir .
+            --output-type cobertura
+            --output-path coverage.xml
+            --branch
+            --ignore-not-existing
+            --ignore "/*"'
+        - mkdir results/
+        - cp results.xml results/results.xml
+        - allure generate -c results/
+    artifacts:
+        when: always
+        paths:
+            - allure-report/
+        reports:
+            junit: results.xml
+            cobertura: coverage.xml
+
+test:bench:
+    extends: .rust-default
+    stage: test
+    needs: [ build ]
+    script:
+        - 'cargo $CHANNEL bench
+            --verbose
+            --color always
+            --workspace
+            --all-targets
+            --all-features
+            --
+            -Z unstable-options
+            --format json
+            | gitlab-report -p bench > metrics.txt'
+    artifacts:
+        when: always
+        reports:
+            metrics: metrics.txt
+
+.test:test-e2e:
+    extends: .rust-default
+    stage: test
+    needs: [ build ]
     script:
         - echo test
+    artifacts:
+        reports:
+            junit: results.xml
+
+.test:bench-e2e:
+    extends: .rust-default
+    stage: test
+    needs: [ build ]
+    script:
+        - echo bench
+    artifacts:
+        reports:
+            junit: metrics.txt
 
 release:registry:
     stage: release
-    image: curlimages/curl:latest
-    needs: [ build ]
+    image: registry.gitlab.com/tobip64/rust-gitlab-ci:latest
+    needs: [ "check:audit", "build", "test:test" ]
     timeout: 5m
-    parallel:
-        matrix:
-            -   CHANNEL: [ stable, beta, nightly ]
-                PROFILE: [ debug, release ]
-                PACKAGE: []
-                TARGET:
-                    - x86_64-unknown-linux-gnu
-                    - aarch64-unknown-linux-gnu
-                    - wasm32-wasi
     variables:
         GIT_STRATEGY: none
     script:
-        - 'curl
-          --header "JOB-TOKEN: $CI_JOB_TOKEN"
-          --upload-file $CI_PROJECT_DIR/target/$PROFILE/$TARGET/$PACKAGE
-          $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$CI_COMMIT_REF_SLUG/$CI_COMMIT_SHA/$CHANNEL-$TARGET-$PACKAGE'
+        - |
+            cd target
+            find -regex "\./[a-zA-Z0-9_]+-[a-zA-Z0-9_]+[^/]*/[a-z]+/[^/]*" > FILES
+            tar -czvf package.tar.gz -T FILES
+            curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file package.tar.gz $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$CI_COMMIT_REF_SLUG/$CI_COMMIT_SHA/package.tar.gz
 
 release:docker:
     image: docker:20.10.6
     stage: release
-    needs: [ build ]
+    needs: [ "check:audit", "build", "test:test" ]
     services:
         -   name: docker:20.10.6-dind
             entrypoint: [ "env", "-u", "DOCKER_HOST" ]
@@ -217,7 +281,7 @@ release:docker:
 release:pages:
     stage: release
     image: alpine:latest
-    needs: [ "build:docs" ]
+    needs: [ "check:audit", "build:docs", "test:test" ]
     variables:
         GIT_STRATEGY: none
     rules:
@@ -232,7 +296,7 @@ release:pages:
 release:gitlab:
     stage: release
     image: registry.gitlab.com/gitlab-org/release-cli:latest
-    needs: [ build ]
+    needs: [ "check:audit", "test:test" ]
     variables:
         GIT_STRATEGY: none
     rules:
@@ -253,10 +317,10 @@ release:gitlab:
         tag_name: $CI_COMMIT_TAG
         ref: $CI_COMMIT_SHA
 
-release:crates:
+.release:crates:
     image: registry.gitlab.com/tobip64/rust-gitlab-ci:latest
     stage: release
-    needs: [ build ]
+    needs: [ "check:audit", "build", "test:test" ]
     rules:
         -   if: $CI_COMMIT_TAG
             when: manual

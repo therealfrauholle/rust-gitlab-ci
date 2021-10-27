@@ -23,61 +23,60 @@
 use super::*;
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
-pub enum CargoMessage {
-	Suite(CargoTestReportSuite),
-	Test(CargoTestReportTest),
-	Bench(CargoTestReportBench)
+#[serde(tag = "reason", rename_all = "kebab-case")]
+pub enum Message {
+	CompilerMessage(CompilerMessage),
+	CompilerArtifact,
+	BuildFinished,
+	BuildScriptExecuted,
+	#[serde(other)]
+	Other
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(tag = "event", rename_all = "lowercase")]
-pub enum CargoTestReportSuite {
-	Started(CargoTestReportSuiteStarted),
-	Ok(CargoTestReportSuiteOkOrFailed),
-	Failed(CargoTestReportSuiteOkOrFailed)
+pub struct CompilerMessage {
+	pub message: CompilerMessageMessage
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct CargoTestReportSuiteStarted {
-	pub test_count: usize
+pub struct CompilerMessageMessage {
+	pub rendered: String,
+	pub code:     Option<CompilerMessageMessageCode>,
+	pub level:    String,
+	pub message:  String,
+	pub spans:    Vec<CompilerMessageMessageSpan>
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct CargoTestReportSuiteOkOrFailed {
-	pub passed:        usize,
-	pub failed:        usize,
-	pub allowed_fail:  usize,
-	pub ignored:       usize,
-	pub measured:      usize,
-	pub filtered_out:  usize,
-	pub exec_time:     f64
+pub struct CompilerMessageMessageCode {
+	pub code:        String,
+	pub explanation: Option<String>
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct CargoTestReportTest {
-	pub name: String,
-	#[serde(flatten)]
-	pub event: CargoTestReportTestEvent
+pub struct CompilerMessageMessageSpan {
+	pub file_name:    String,
+	pub line_start:   usize,
+	pub line_end:     usize,
+	pub column_start: usize,
+	pub column_end:   usize,
 }
 
-#[derive(Clone, Debug, Deserialize)]
-#[serde(tag = "event", rename_all = "lowercase")]
-pub enum CargoTestReportTestEvent {
-	Started,
-	Ignored,
-	Ok(CargoTestReportTestOkOrFailed),
-	Failed(CargoTestReportTestOkOrFailed)
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct CargoTestReportTestOkOrFailed {
-	pub stdout: Option<String>
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct CargoTestReportBench {
-	pub name:      String,
-	pub median:    f64,
-	pub deviation: f64
+impl Into<code_climate::CodeQualityReportLocation> for CompilerMessageMessageSpan {
+	fn into(self) -> code_climate::CodeQualityReportLocation {
+		code_climate::CodeQualityReportLocation {
+			path:      self.file_name,
+			lines:     None,
+			positions: Some(code_climate::CodeQualityReportPositions {
+				begin: code_climate::CodeQualityReportPosition::Coordinates {
+					line:   self.line_start,
+					column: self.column_start
+				},
+				end:   code_climate::CodeQualityReportPosition::Coordinates {
+					line:   self.line_end,
+					column: self.column_end
+				}
+			})
+		}
+	}
 }

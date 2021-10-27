@@ -23,61 +23,51 @@
 use super::*;
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
-pub enum CargoMessage {
-	Suite(CargoTestReportSuite),
-	Test(CargoTestReportTest),
-	Bench(CargoTestReportBench)
+pub struct Report {
+	pub packages:                   Vec<Package>,
+	//pub packages_without_metrics:   Vec<()>,
+	//pub used_but_not_scanned_files: Vec<()>
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(tag = "event", rename_all = "lowercase")]
-pub enum CargoTestReportSuite {
-	Started(CargoTestReportSuiteStarted),
-	Ok(CargoTestReportSuiteOkOrFailed),
-	Failed(CargoTestReportSuiteOkOrFailed)
+pub struct Package {
+	pub package:  PackagePackage,
+	pub unsafety: PackageUnsafety
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct CargoTestReportSuiteStarted {
-	pub test_count: usize
+pub struct PackagePackage {
+	pub id:                 PackagePackageId,
+	pub dependencies:       Vec<PackagePackage>,
+	pub dev_dependencies:   Vec<PackagePackage>,
+	pub build_dependencies: Vec<PackagePackage>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct CargoTestReportSuiteOkOrFailed {
-	pub passed:        usize,
-	pub failed:        usize,
-	pub allowed_fail:  usize,
-	pub ignored:       usize,
-	pub measured:      usize,
-	pub filtered_out:  usize,
-	pub exec_time:     f64
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct CargoTestReportTest {
+pub struct PackagePackageId {
 	pub name: String,
-	#[serde(flatten)]
-	pub event: CargoTestReportTestEvent
+	pub version: String,
+	//source:
 }
 
 #[derive(Clone, Debug, Deserialize)]
-#[serde(tag = "event", rename_all = "lowercase")]
-pub enum CargoTestReportTestEvent {
-	Started,
-	Ignored,
-	Ok(CargoTestReportTestOkOrFailed),
-	Failed(CargoTestReportTestOkOrFailed)
+pub struct PackageUnsafety {
+	pub used:           PackageUnsafetyCounts,
+	pub unused:         PackageUnsafetyCounts,
+	pub forbids_unsafe: bool
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct CargoTestReportTestOkOrFailed {
-	pub stdout: Option<String>
+pub struct PackageUnsafetyCounts {
+	pub functions:   PackageUnsafetyCount,
+	pub exprs:       PackageUnsafetyCount,
+	pub item_impls:  PackageUnsafetyCount,
+	pub item_traits: PackageUnsafetyCount,
+	pub methods:     PackageUnsafetyCount
 }
 
 #[derive(Clone, Debug, Deserialize)]
-pub struct CargoTestReportBench {
-	pub name:      String,
-	pub median:    f64,
-	pub deviation: f64
+pub struct PackageUnsafetyCount {
+	pub safe:    usize,
+	pub unsafe_: usize
 }

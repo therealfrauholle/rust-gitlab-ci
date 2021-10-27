@@ -2,7 +2,7 @@
 
 A command line utility to generate GitLab compatible reports from cargo JSON output.
 
-Supported formats:
+## Supported formats
 
 | Input  | Output
 |:-------|:---
@@ -11,7 +11,11 @@ Supported formats:
 | clippy | Code Climate
 | clippy | OpenMetrics
 | bench  | OpenMetrics
-| audit  | GitLab SAST
+| audit  | GitLab Security Report (SAST)
+| audit  | GitLab Security Report (Dependency Scanning)
+| geiger | GitLab Security Report (SAST)
+| geiger | GitLab Security Report (Dependency Scanning)
+| fmt    | -
 
 ## Usage
 
@@ -19,5 +23,5 @@ Supported formats:
 cargo test --no-fail-fast -- -Z unstable-options --format json | gitlab-report -p test > report.xml
 cargo clippy --message-format=json | gitlab-report -p clippy > gl-code-quality-report.json
 cargo bench -- -Z unstable-options --format json | gitlab-report -p bench > metrics.txt
-cargo audit | gitlab-report -p audit > gl-sast-report.json
+cargo audit --json | gitlab-report -p audit > gl-sast-report.json
 ```

@@ -28,11 +28,11 @@ use super::*;
 
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename = "testsuites")]
-pub struct JUnitReport(pub Vec<JUnitReportTestsuite>);
+pub struct Report(pub Vec<Testsuite>);
 
 #[derive(Clone, Debug, Default, Serialize)]
 #[serde(rename = "testsuite")]
-pub struct JUnitReportTestsuite {
+pub struct Testsuite {
 	pub id:         usize,
 	pub name:       String,
 	pub timestamp:  String,
@@ -43,21 +43,21 @@ pub struct JUnitReportTestsuite {
 	pub skipped:    usize,
 	pub time:       f64,
 	#[serde(rename = "property")]
-	pub properties: Option<Vec<JUnitReportTestsuiteProperty>>,
+	pub properties: Option<Vec<TestsuiteProperty>>,
 	#[serde(rename = "testcase")]
-	pub testcases:  Option<Vec<JUnitReportTestsuiteTestcase>>
+	pub testcases:  Option<Vec<TestsuiteTestcase>>
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
-pub struct JUnitReportTestsuiteProperty {
+pub struct TestsuiteProperty {
 	pub name:  String,
 	pub value: String
 }
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename = "testcase")]
-pub struct JUnitReportTestsuiteTestcase {
-	pub status:    Option<JUnitReportTestsuiteTestcaseStatus>,
+pub struct TestsuiteTestcase {
+	pub status:    Option<TestsuiteTestcaseStatus>,
 	pub name:      String,
 	pub classname: String,
 	pub time:      f64
@@ -65,7 +65,7 @@ pub struct JUnitReportTestsuiteTestcase {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum JUnitReportTestsuiteTestcaseStatus {
+pub enum TestsuiteTestcaseStatus {
 	Skipped,
 	//Error(#[serde(flatten)] TestsuiteTestcaseErrorOrFailure),
 	//Failure(#[serde(flatten)] TestsuiteTestcaseErrorOrFailure)

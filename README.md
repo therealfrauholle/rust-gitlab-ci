@@ -2,13 +2,13 @@
 
 Utilities and images for Rust GitLab CI/CD pipelines.
 
-## GitLab Ci/CD Templates
+## GitLab CI/CD Template
 
-This repository contains one template for binaries (`rust-bin.gitlab-ci.yml`) and
-one for libraries (`rust-lib.gitlab-ci.yml`). They can be included like this:
+This repository contains a template for Rust crates/workspaces (`rust.gitlab-ci.yml`) and
+It can be included like this:
 
 ```yaml
-include: https://gitlab.com/TobiP64/rust-gitlab-ci/-/raw/master/rust-bin.gitlab-ci.yml
+include: https://gitlab.com/TobiP64/rust-gitlab-ci/-/raw/master/rust.gitlab-ci.yml
 ```
 
 ## gitlab-report

@@ -20,80 +20,103 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#[derive(Clone, Debug, Default)]
-pub struct CargoAuditIssue {
-	pub __crate:         String,
-	pub version:         String,
-	pub warning:         Option<String>,
-	pub title:           Option<String>,
-	pub date:            Option<String>,
-	pub id:              Option<String>,
-	pub url:             Option<String>,
-	pub solution:        Option<String>,
-	pub dependency_tree: String
+use {super::*, std::collections::HashMap};
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Report {
+	pub database:        Database,
+	pub lockfile:        Lockfile,
+	pub settings:        Settings,
+	pub vulnerabilities: SettingsVulnerabilities,
+	pub warnings:        HashMap<String, Vec<Issue>>
 }
 
-impl std::str::FromStr for CargoAuditIssue {
-	type Err = ();
-	
-	#[allow(clippy::while_let_on_iterator)]
-	fn from_str(s: &str) -> Result<Self, Self::Err> {
-		let mut lines = s.lines();
-		let mut self_ = Self::default();
-		
-		while let Some(line) = lines.next() {
-			if line.trim().is_empty() {
-				break;
-			}
-			
-			let (key, val) = match line.split_once(':') {
-				Some(v) => v,
-				None => continue
-			};
-			
-			match key {
-				"Crate"           => self_.__crate  = val.trim().to_string(),
-				"Version"         => self_.version  = val.trim().to_string(),
-				"Warning"         => self_.warning  = Some(val.trim().to_string()),
-				"Title"           => self_.title    = Some(val.trim().to_string()),
-				"Date"            => self_.date     = Some(val.trim().to_string()),
-				"ID"              => self_.id       = Some(val.trim().to_string()),
-				"URL"             => self_.url      = Some(val.trim().to_string()),
-				"Solution"        => self_.solution = Some(val.trim().to_string()),
-				"Dependency tree" => {
-					let mut buf = String::new();
-					
-					while let Some(line) = lines.next() {
-						if line.trim().is_empty() {
-							break;
-						}
-						
-						buf.push_str(line);
-					}
-					
-					self_.dependency_tree = buf;
-				},
-				_                  => continue
-			}
-		}
-		
-		if self_.__crate.is_empty() || self_.version.is_empty() || self_.dependency_tree.is_empty() {
-			Err(())
-		} else {
-			Ok(self_)
-		}
-	}
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Database {
+	pub advisory_count: usize,
+	pub last_commit:    String,
+	pub last_updated:   String
 }
 
-pub fn find_next_issue(mut buf: &str) -> Option<(&str, &str)> {
-	loop {
-		if buf.is_empty() {
-			return None;
-		} else if buf.starts_with("Crate:") {
-			let end = buf.find("\n\n").unwrap_or(buf.len());
-			return Some((&buf[..end], &buf[end..]))
-		}
-		
-		buf = buf.split_once('\n').unwrap_or(("", "")).1;
-	}
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Lockfile {
+	pub dependency_count: usize
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct Settings {
+	pub target_arch:            Option<String>,
+	pub target_os:              Option<String>,
+	pub severity:               Option<String>,
+	pub ignore:                 Vec<String>,
+	pub informational_warnings: Vec<String>,
+	pub package_scope:          Option<String>
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct SettingsVulnerabilities {
+	pub found: bool,
+	pub count: usize,
+	pub list:  Vec<Issue>
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct Issue {
+	pub kind:     Option<String>,
+	pub advisory: IssueAdvisory,
+	pub versions: IssueVersions,
+	pub affected: Option<IssueAffected>,
+	pub package:  IssuePackage
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct IssueAdvisory {
+	pub id:            String,
+	pub package:       String,
+	pub title:         String,
+	pub description:   String,
+	pub date:          String,
+	pub aliases:       Vec<String>,
+	pub related:       Vec<String>,
+	pub collection:    String,
+	pub categories:    Vec<String>,
+	pub keywords:      Vec<String>,
+	pub cvss:          Option<String>,
+	pub informational: Option<String>,
+	pub url:           String,
+	pub references:    Vec<String>,
+	pub withdrawn:     Option<String>
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct IssueVersions {
+	pub patched:    Vec<String>,
+	pub unaffected: Vec<String>
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct IssueAffected {
+	pub arch:      Vec<String>,
+	pub os:        Vec<String>,
+	pub functions: HashMap<String, Vec<String>>
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct IssuePackage {
+	pub name:         String,
+	pub version:      String,
+	pub source:       String,
+	pub checksum:     String,
+	pub dependencies: Vec<IssuePackageDependency>,
+	pub replace:      Option<String>
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct IssuePackageDependency {
+	pub name:    String,
+	pub version: String,
+	pub source:  Option<String>
 }
