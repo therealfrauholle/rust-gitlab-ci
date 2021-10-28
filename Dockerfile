@@ -41,6 +41,11 @@ RUN apk add --no-cache musl-dev libgcc openssl curl clang openjdk11-jre-headless
     } && \
     ln -sf /usr/lib/libgcc_s.so.1 /usr/lib/libgcc_s.so && \
 	ln -sf /usr/bin/clang /usr/bin/cc && \
+    ln -sf /usr/bin/clang /usr/bin/riscv64-linux-musl-gcc && \
+    ln -sf /usr/bin/clang /usr/bin/aarch64-linux-musl-gcc && \
+    ln -sf /usr/bin/clang /usr/bin/powerpc64le-linux-musl-gcc && \
+    ln -sf /usr/bin/clang /usr/bin/mips64-linux-musl-gcc && \
+    ln -sf /usr/bin/clang /usr/bin/x86_64-linux-gnu-gcc && \
     ln -sf /usr/local/rustup/toolchains/stable-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/bin/rust-lld /usr/bin/ld && \
     ln -sf /usr/local/rustup/toolchains/stable-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/bin/llvm-ar /usr/bin/ar && \
     ln -sf /usr/local/rustup/toolchains/stable-x86_64-unknown-linux-musl/lib/rustlib/x86_64-unknown-linux-musl/lib/self-contained/* /usr/lib/ && \
