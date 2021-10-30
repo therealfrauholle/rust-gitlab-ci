@@ -1,4 +1,5 @@
 stages:
+    - docker
     - check
     - build
     - test
@@ -21,6 +22,7 @@ workflow:
     timeout: 30m
     variables:
         CARGO_HOME: $CI_PROJECT_DIR/cargo
+        CACHE_FALLBACK_KEY: $CI_DEFAULT_BRANCH
     parallel:
         matrix:
             -   CHANNEL: [ stable, beta, nightly ]
@@ -29,7 +31,7 @@ workflow:
             allow_failure: false
         -   allow_failure: true
     before_script:
-        - rustup --version && rustc --version && cargo --version && echo $RUSTFLAGS
+        - rustup --version && rustc --version && cargo --version && echo $RUSTFLAGS && echo $CARGO_OPTS
 
 check:clippy:
     extends: .rust-default
@@ -41,6 +43,7 @@ check:clippy:
             --all-targets
             --all-features
             --message-format=json
+            $CARGO_OPTS
             | gitlab-report -p clippy > gl-code-quality-report.json'
     artifacts:
         when: always
@@ -54,7 +57,7 @@ check:fmt:
     rules:
         -   if: $RUN_RUST_FMT
     script:
-        - cargo +stable fmt -- --check
+        - cargo +stable fmt $CARGO_OPTS -- --check
     allow_failure: true
 
 check:audit:
@@ -62,7 +65,7 @@ check:audit:
     stage: check
     parallel:
     script:
-        - cargo audit --color=always --json | gitlab-report -p audit -f gl-sast > gl-sast-report.json
+        - cargo audit --color=always --json $CARGO_OPTS | gitlab-report -p audit -f gl-sast > gl-sast-report.json
     artifacts:
         when: always
         reports:
@@ -73,7 +76,7 @@ check:geiger:
     stage: check
     parallel:
     script:
-        - cargo geiger --all-dependencies --color always --output-format Json | gitlab-report -p geiger -f gl-sast > gl-sast-report.json
+        - cargo geiger --all-dependencies --color always --output-format Json $CARGO_OPTS | gitlab-report -p geiger -f gl-sast > gl-sast-report.json
     artifacts:
         when: always
         reports:
@@ -147,7 +150,7 @@ build:docs:
     needs: [ "check:clippy" ]
     parallel:
     script:
-        - cargo +stable doc --color=always --verbose --no-deps
+        - cargo +stable doc --color=always --verbose --no-deps $CARGO_OPTS
     artifacts:
         paths:
             - target/doc
@@ -167,6 +170,7 @@ test:test:
             --
             -Z unstable-options
             --format json
+            $CARGO_OPTS
             | gitlab-report -p test > results.xml'
     after_script:
         - 'grcov .
@@ -199,6 +203,7 @@ test:bench:
             --workspace
             --all-targets
             --all-features
+            $CARGO_OPTS
             --
             -Z unstable-options
             --format json
@@ -236,13 +241,12 @@ release:registry:
     variables:
         GIT_STRATEGY: none
     script:
-        - |
-            cd target
-            find -regex "\./[a-zA-Z0-9_]+-[a-zA-Z0-9_]+[^/]*/[a-z]+/[^/]*" > FILES
-            tar -czvf package.tar.gz -T FILES
-            curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file package.tar.gz $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$CI_COMMIT_REF_SLUG/$CI_COMMIT_SHA/package.tar.gz
+        - 'cd target
+          && find . -mindepth 3 -maxdepth 3 -type f
+          | tar -czv -T -
+          | curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file . $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$CI_COMMIT_REF_SLUG/$CI_COMMIT_SHA/package.tar.gz'
 
-release:docker:
+.release:docker:
     image: docker:20.10.6
     stage: release
     needs: [ "check:audit", "build", "test:test" ]
@@ -323,4 +327,4 @@ release:gitlab:
     before_script:
         - rustup --version && rustc --version && cargo --version && echo $RUSTFLAGS
     script:
-        - cargo publish --registry $CARGO_REGISTRY --token $CARGO_REGISTRY_TOKEN
+        - cargo publish --registry $CARGO_REGISTRY --token $CARGO_REGISTRY_TOKEN $CARGO_OPTS
