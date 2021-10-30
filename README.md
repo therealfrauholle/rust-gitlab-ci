@@ -5,7 +5,7 @@ Utilities and images for Rust GitLab CI/CD pipelines.
 ## GitLab CI/CD Template
 
 This repository contains a template for Rust crates/workspaces (`rust.gitlab-ci.yml`) and
-It can be included like this:
+it can be included like this:
 
 ```yaml
 include: https://gitlab.com/TobiP64/rust-gitlab-ci/-/raw/master/rust.gitlab-ci.yml
@@ -59,11 +59,14 @@ Tools:
 
 Other Packages:
 
+- curl
+- clang (required by some libraries)
 - openssl (required by cargo-audit)
 - openjdk11-jre-headless (required by Allure)
 
 ### build-std
 
-There is also a very minimalistic Dockerfile that does not contain pre-compiled stdlib
-and builds with `-Zbuild-std`. A docker image is not built in the CI pipeline, but is
-supposed to be built manually.
+If the docker build arg `PREBUILT_STD` is set to `false`, no pre-compiled binaries will
+be downloaded. Instead `rust-src` is downloaded and to build, the `-Zbuild-std` flag
+must be specified. Since this is a nightly feature, only the nightly version of Rust is
+installed.

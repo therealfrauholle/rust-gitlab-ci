@@ -244,7 +244,7 @@ release:registry:
         - 'cd target
           && find . -mindepth 3 -maxdepth 3 -type f
           | tar -czv -T -
-          | curl --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file . $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$CI_COMMIT_REF_SLUG/$CI_COMMIT_SHA/package.tar.gz'
+          | curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file . $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$CI_COMMIT_REF_SLUG/$CI_COMMIT_SHA/package.tar.gz'
 
 .release:docker:
     image: docker:20.10.6
