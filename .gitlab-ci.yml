@@ -2,18 +2,8 @@ include:
     - local: /rust.gitlab-ci.yml
 
 docker:
-    image: docker:latest
-    stage: docker
-    services:
-        - name: docker:dind
-          entrypoint: [ "env", "-u", "DOCKER_HOST" ]
-          command: [ "dockerd-entrypoint.sh" ]
-    variables:
-        DOCKER_HOST: tcp://docker:2375/
-        DOCKER_DRIVER: overlay2
-        DOCKER_TLS_CERTDIR: ""
+    extends: .docker
     script:
-        - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
         - docker build -t $CI_REGISTRY_IMAGE:latest -f Dockerfile .
         - docker build -t $CI_REGISTRY_IMAGE:no_std -f Dockerfile . --build-arg PREBUILT_STD=false
         - docker push $CI_REGISTRY_IMAGE:latest

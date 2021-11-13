@@ -4,12 +4,27 @@ stages:
     - build
     - test
     - release
+    - deploy
 
 workflow:
     rules:
         -   if: $CI_PIPELINE_SOURCE != 'push' || $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_TAG
             when: always
         -   when: never
+
+.docker:
+    image: docker:20.10.6
+    stage: docker
+    services:
+        - name: docker:20.10.6-dind
+          entrypoint: [ "env", "-u", "DOCKER_HOST" ]
+          command: [ "dockerd-entrypoint.sh" ]
+    variables:
+        DOCKER_HOST: tcp://docker:2375/
+        DOCKER_DRIVER: overlay2
+        DOCKER_TLS_CERTDIR: ""
+    before_script:
+        - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
 
 .rust-default:
     image: registry.gitlab.com/tobip64/rust-gitlab-ci:latest
@@ -328,3 +343,42 @@ release:gitlab:
         - rustup --version && rustc --version && cargo --version && echo $RUSTFLAGS
     script:
         - cargo publish --registry $CARGO_REGISTRY --token $CARGO_REGISTRY_TOKEN $CARGO_OPTS
+
+.deploy:
+    stage: deploy
+    needs: [build, "release:registry"]
+    image: registry.gitlab.com/tobip64/rust-gitlab-ci:latest
+    retry: 2
+    timeout: 5m
+    variables:
+        GIT_STRATEGY: none
+
+.deploy:development:
+    extends: .deploy
+    environment:
+        name: development
+    rules:
+        -   if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+.deploy:production:
+    extends: .deploy
+    environment:
+        name: production
+    rules:
+        - if: $CI_COMMIT_TAG
+
+.deploy:review:
+    extends: .deploy
+    environment:
+        name: review/$CI_COMMIT_REF_NAME
+        on_stop: cleanup:review
+    rules:
+        - if: $CI_MERGE_REQUEST_ID
+
+.cleanup:review:
+    extends: .deploy
+    environment:
+        name: review/$CI_COMMIT_REF_NAME
+        action: stop
+    rules:
+        - if: $CI_MERGE_REQUEST_ID
