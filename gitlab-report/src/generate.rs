@@ -74,12 +74,14 @@ pub fn test_to_junit(
 						classname: module.to_string(),
 						time:      now
 					}),
-					cargo::CargoTestReportTestEvent::Ignored => testcases.push(junit::TestsuiteTestcase {
-						status:    Some(junit::TestsuiteTestcaseStatus::Skipped),
-						name:      name.to_string(),
-						classname: module.to_string(),
-						time:      0.0
-					}),
+					cargo::CargoTestReportTestEvent::Ignored => {
+						let testcase = testcases.iter_mut()
+							.find(|case| case.classname == module && case.name == name)
+							.unwrap();
+						
+						testcase.time = now - testcase.time;
+						testcase.status = Some(junit::TestsuiteTestcaseStatus::Skipped);
+					},
 					event @ cargo::CargoTestReportTestEvent::Ok(_) | event @ cargo::CargoTestReportTestEvent::Failed(_) => {
 						let testcase = testcases.iter_mut()
 							.find(|case| case.classname == module && case.name == name)
