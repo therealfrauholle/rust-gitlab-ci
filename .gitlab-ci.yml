@@ -2,15 +2,25 @@ include:
     - local: /rust.gitlab-ci.yml
 
 docker:
-    extends: .docker
+    extends: .docker-default
+    stage: .pre
+    timeout: 2h
     script:
         - docker build -t $CI_REGISTRY_IMAGE:latest -f Dockerfile .
-        - docker build -t $CI_REGISTRY_IMAGE:no_std -f Dockerfile . --build-arg PREBUILT_STD=false
         - docker push $CI_REGISTRY_IMAGE:latest
-        - docker push $CI_REGISTRY_IMAGE:no_std
     rules:
-        -   changes:
-                - Dockerfile
+        - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
+
+docker:lld-musl:
+    extends: .docker-default
+    stage: .pre
+    timeout: 2h
+    allow_failure: true
+    script:
+        - docker build -t $CI_REGISTRY_IMAGE:lld-musl -f Dockerfile-lld-musl .
+        - docker push $CI_REGISTRY_IMAGE:lld-musl
+    rules:
+        - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
 
 build:
     parallel:
@@ -18,3 +28,4 @@ build:
             -   CHANNEL: [ stable, beta, nightly ]
                 PROFILE: [ debug, release ]
                 TARGET: [ x86_64-unknown-linux-musl ]
+                CARGO_OPTS: [ "--workspace" ]

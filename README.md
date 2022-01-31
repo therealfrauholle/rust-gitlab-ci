@@ -4,8 +4,8 @@ Utilities and images for Rust GitLab CI/CD pipelines.
 
 ## GitLab CI/CD Template
 
-This repository contains a template for Rust crates/workspaces (`rust.gitlab-ci.yml`) and
-it can be included like this:
+This repository contains a template for Rust crates/workspaces (`rust.gitlab-ci.yml`) that should cover most use cases.
+It can be included like this:
 
 ```yaml
 include: https://gitlab.com/TobiP64/rust-gitlab-ci/-/raw/master/rust.gitlab-ci.yml
@@ -15,58 +15,75 @@ include: https://gitlab.com/TobiP64/rust-gitlab-ci/-/raw/master/rust.gitlab-ci.y
 
 A command line utility to generate GitLab compatible reports from cargo JSON output.
 
-## Docker Image
+## Docker Images
 
-This repository provides an alpine based docker image. It is configured to
-use rust-lld and musl libc.
+### latest
+
+A Fedora based image with the GNU toolchain.
 
 Components:
 
-- llvm-tools-preview-x86_64-unknown-linux-musl (stable)
-- rustfmt-x86_64-unknown-linux-gnu (stable)
-- cargo-x86_64-unknown-linux-musl (stable)
-- clippy-x86_64-unknown-linux-musl (stable)
-- rustc-x86_64-unknown-linux-musl (stable)
-- rust-std-x86_64-unknown-linux-musl (stable)
-- rust-std-mips64el-unknown-linux-muslabi64 (stable)
-- rust-std-aarch64-unknown-linux-musl (stable)
-- rust-std-wasm32-unknown-unknown (stable)
-- rust-std-wasm32-wasi (stable)
-- cargo-x86_64-unknown-linux-musl (beta)
-- clippy-x86_64-unknown-linux-musl (beta)
-- rustc-x86_64-unknown-linux-musl (beta)
-- rust-std-x86_64-unknown-linux-musl (beta)
-- rust-std-mips64el-unknown-linux-muslabi64 (beta)
-- rust-std-aarch64-unknown-linux-musl (beta)
-- rust-std-wasm32-unknown-unknown (beta)
-- rust-std-wasm32-wasi (beta)
-- cargo-x86_64-unknown-linux-musl (nightly)
-- clippy-x86_64-unknown-linux-musl (nightly)
-- rustc-x86_64-unknown-linux-musl (nightly)
-- rust-std-x86_64-unknown-linux-musl (nightly)
-- rust-std-mips64el-unknown-linux-muslabi64 (nightly)
-- rust-std-aarch64-unknown-linux-musl (nightly)
-- rust-std-wasm32-unknown-unknown (nightly)
-- rust-std-wasm32-wasi (nightly)
+- cargo-x86_64-unknown-linux-gnu
+- clippy-x86_64-unknown-linux-gnu
+- rust-std-wasm32-unknown-unknown
+- rust-std-wasm32-wasi
+- rust-std-x86_64-unknown-linux-gnu
+- rust-std-x86_64-unknown-linux-musl
+- rustc-x86_64-unknown-linux-gnu
+- rustfmt-x86_64-unknown-linux-gnu
 
 Tools:
 
-- gitlab-report
 - cargo-audit
-- cargo-binutils
+- cargo-criterion
+- cargo-expand
+- cargo-geiger
+- gitlab-report
+- grcov
 - wasm-bindgen-cli
+- cargo-binutils
+- cargo-cache
+
+Other Packages:
+
+- openssl-devel (required by cargo-audit)
+- musl-gcc
+- musl-devel
+- findutils
+
+### lld-musl
+
+An Alpine based image, that uses LLD as the default linker and musl libc. This image does not contain the standard
+library, that means the `-Z build-std` flag has to be set for builds. This image currently has various issues, thus
+it is not recommended for production environments.
+
+Components:
+
+- cargo-x86_64-unknown-linux-musl
+- clippy-x86_64-unknown-linux-musl
+- llvm-tools-preview-x86_64-unknown-linux-musl
+- rust-src
+- rustc-x86_64-unknown-linux-musl
+- rustfmt-x86_64-unknown-linux-musl
+
+Tools:
+
+- cargo-audit
+- cargo-criterion
+- cargo-expand
+- cargo-geiger
+- gitlab-report
+- grcov
+- wasm-bindgen-cli
+- cargo-binutils
+- cargo-cache
 - Allure
 
 Other Packages:
 
-- curl
-- clang (required by some libraries)
+- musl-dev
+- libgcc
 - openssl (required by cargo-audit)
+- curl
+- clang
 - openjdk11-jre-headless (required by Allure)
-
-### build-std
-
-If the docker build arg `PREBUILT_STD` is set to `false`, no pre-compiled binaries will
-be downloaded. Instead `rust-src` is downloaded and to build, the `-Zbuild-std` flag
-must be specified. Since this is a nightly feature, only the nightly version of Rust is
-installed.

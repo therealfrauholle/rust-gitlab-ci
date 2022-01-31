@@ -1,8 +1,9 @@
 stages:
-    - docker
     - check
     - build
     - test
+    - docker
+    - test-2
     - release
     - deploy
 
@@ -12,9 +13,8 @@ workflow:
             when: always
         -   when: never
 
-.docker:
+.docker-default:
     image: docker:20.10.6
-    stage: docker
     services:
         - name: docker:20.10.6-dind
           entrypoint: [ "env", "-u", "DOCKER_HOST" ]
@@ -111,17 +111,9 @@ build:
                     - aarch64-unknown-linux-musl
                     - mips64el-unknown-linux-muslabi64
                     - wasm32-wasi
+                CARGO_OPTS: [ "--workspace --all-targets --all-features" ]
     script:
-        - '[[ $CHANNEL == "nightly" ]] && export RUSTFLAGS="$RUSTFLAGS -Zinstrument-coverage" || true'
-        - 'cargo +$CHANNEL build
-            --verbose
-            --color always
-            --workspace
-            --all-targets
-            --all-features
-            --target $TARGET
-            $([[ $PROFILE == "release" ]] && echo "--release" || echo "")
-            $CARGO_OPTS'
+        - cargo +$CHANNEL build --verbose --color always --target $TARGET $([[ $PROFILE == "release" ]] && echo "--release" || echo "") $CARGO_OPTS
     artifacts:
         paths:
             - target/$TARGET/$PROFILE/*
@@ -137,15 +129,13 @@ build:
             matrix:
                 -   CHANNEL: [ nightly ]
                     PROFILE: [ debug, release ]
+                    CARGO_OPTS: [ "--workspace --all-targets --all-features" ]
     script:
-        - export RUSTFLAGS="$RUSTFLAGS -Zinstrument-coverage"
+        - '[[ $PROFILE == "debug" ]] && export RUSTFLAGS="$RUSTFLAGS -Zinstrument-coverage" || true'
         - 'cargo +$CHANNEL build
+            $([[ $PROFILE == "release" ]] && echo "--release" || echo "")
             --verbose
             --color=always
-            --workspace
-            --all-targets
-            --all-features
-            $([[ $PROFILE == "release" ]] && echo "--release" || echo "")
             --target x86_64-unknown-linux-musl
             --target powerpc64le-unknown-linux-musl
             --target aarch64-unknown-linux-musl
@@ -228,26 +218,6 @@ test:bench:
         reports:
             metrics: metrics.txt
 
-.test:test-e2e:
-    extends: .rust-default
-    stage: test
-    needs: [ build ]
-    script:
-        - echo test
-    artifacts:
-        reports:
-            junit: results.xml
-
-.test:bench-e2e:
-    extends: .rust-default
-    stage: test
-    needs: [ build ]
-    script:
-        - echo bench
-    artifacts:
-        reports:
-            junit: metrics.txt
-
 release:registry:
     stage: release
     image: registry.gitlab.com/tobip64/rust-gitlab-ci:latest
@@ -279,8 +249,9 @@ release:registry:
         matrix:
             -   CHANNEL: [ stable, beta, nightly ]
                 PROFILE: [ debug, release ]
-    script:
+    before_script:
         - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    script:
         - docker buildx create --name builder
         - docker buildx use builder
         - 'docker buildx build
