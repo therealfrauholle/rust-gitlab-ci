@@ -346,16 +346,31 @@ fn audit_issue_to_gitlab_vuln(issue: audit::Issue, ty: gitlab_security_report::S
 			None    => gitlab_security_report::VulnerabilitySeverity::High,
 			Some(_) => gitlab_security_report::VulnerabilitySeverity::Medium
 		}),
-		name:        Some(issue.advisory.id.clone()),
-		message:     Some(issue.advisory.title.clone()),
-		description: Some(issue.advisory.description.clone()),
+		name:        Some(match &issue.advisory {
+			None => format!("{}@{}", issue.package.name.clone(), issue.package.version.clone()),
+			Some(advisory) => advisory.id.clone()
+		}),
+		message:     
+		Some(match &issue.advisory {
+			None => format!("{}: {}", issue.kind.unwrap_or("unknown".to_string()), issue.package.name.clone()),
+			Some(advisory) => advisory.title.clone()
+		}),
+		description: Some(match &issue.advisory {
+			None => "".to_string(),
+			Some(advisory) => advisory.description.clone()
+		}),
 		confidence:  Some(gitlab_security_report::VulnerabilityConfidence::Confirmed),
-		identifiers: vec![gitlab_security_report::VulnerabilityIdentifier {
-			r#type: "RUSTSEC Advisory".to_string(),
-			name:   issue.advisory.id.clone(),
-			value:  issue.advisory.id.clone(),
-			url:    Some(issue.advisory.url.clone())
-		}],
+		identifiers: match &issue.advisory {
+    		Some(advisory) => {
+    		    vec![gitlab_security_report::VulnerabilityIdentifier {
+				    r#type: "RUSTSEC Advisory".to_string(),
+				    name:   advisory.id.clone(),
+				    value:  advisory.id.clone(),
+				    url:    Some(advisory.url.clone())
+			    }]
+		    }
+    		_ => Vec::new(),
+		},
 		location:   match ty {
 			gitlab_security_report::ScanType::DependencyScanning => gitlab_security_report::VulnerabilityLocation::DependencyScanning {
 				file:       None,
