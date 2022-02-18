@@ -22,6 +22,7 @@
 
 use super::*;
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Clone, Debug, Deserialize)]
 #[serde(tag = "reason", rename_all = "kebab-case")]
 pub enum Message {

@@ -92,7 +92,7 @@ pub fn test_to_junit(
 							cargo::CargoTestReportTestEvent::Ok(_v) => None,
 							cargo::CargoTestReportTestEvent::Failed(v) => Some(junit::TestsuiteTestcaseStatus::Failure {
 								r#type:  "cargo test".to_string(),
-								message: v.stdout.unwrap_or_else(String::new)
+								message: v.stdout.unwrap_or_default()
 							}),
 							_ => unreachable!()
 						};
@@ -176,7 +176,8 @@ pub fn clippy_to_code_quality(
 		
 		issues.push(code_climate::CodeQualityReportIssue {
 			r#type:             code_climate::CODE_QUALITY_REPORT_TYPE,
-			check_name:         msg.message.code.as_ref().unwrap().code.clone(),
+			check_name:         msg.message.code.as_ref()
+				.map_or_else(|| "unknown".to_string(), |v| v.code.clone()),
 			description:        msg.message.message.clone(),
 			content:            Some(format!("```{}```", msg.message.rendered)),
 			categories:         vec![code_climate::CodeQualityReportIssueCategory::Style],
@@ -225,7 +226,9 @@ pub fn clippy_to_open_metrics(
 			_ => continue
 		};
 		
-		*metrics.entry((msg.message.level, msg.message.code.unwrap().code)).or_insert(0) += 1;
+		*metrics.entry((msg.message.level, msg.message.code.as_ref()
+			.map_or_else(|| "unknown".to_string(), |v| v.code.clone())))
+			.or_insert(0) += 1;
 	}
 	
 	eprintln!("  \x1b[32;1mGenerating\x1b[0m OpenMetrics report");
@@ -342,41 +345,33 @@ pub fn geiger_to_gitlab_security_report(
 fn audit_issue_to_gitlab_vuln(issue: audit::Issue, ty: gitlab_security_report::ScanType) -> gitlab_security_report::Vulnerability {
 	gitlab_security_report::Vulnerability {
 		category:    "Dependency Scanning".to_string(),
-		severity:    Some(match &issue.kind {
-			None    => gitlab_security_report::VulnerabilitySeverity::High,
-			Some(_) => gitlab_security_report::VulnerabilitySeverity::Medium
+		severity:    Some(match issue.kind.as_deref() {
+			None           => gitlab_security_report::VulnerabilitySeverity::High,
+			Some("notice") => gitlab_security_report::VulnerabilitySeverity::Info,
+			Some(_)        => gitlab_security_report::VulnerabilitySeverity::Medium
 		}),
-		name:        Some(match &issue.advisory {
-			None => format!("{}@{}", issue.package.name.clone(), issue.package.version.clone()),
-			Some(advisory) => advisory.id.clone()
-		}),
-		message:     
-		Some(match &issue.advisory {
-			None => format!("{}: {}", issue.kind.unwrap_or("unknown".to_string()), issue.package.name.clone()),
-			Some(advisory) => advisory.title.clone()
-		}),
-		description: Some(match &issue.advisory {
-			None => "".to_string(),
-			Some(advisory) => advisory.description.clone()
-		}),
+		name:        issue.advisory.as_ref().map(|v| v.id.clone())
+			.or_else(|| issue.package.as_ref().map(|v| format!("{}@{}", v.name, v.version))),
+		message:     issue.advisory.as_ref().map(|v| v.title.clone())
+			.or_else(|| issue.package.as_ref()
+				.map(|v| format!("{}@{} ({})", v.name, v.version, issue.kind.as_deref().unwrap_or("error")))),
+		description: issue.advisory.as_ref().map(|v| v.description.clone()),
 		confidence:  Some(gitlab_security_report::VulnerabilityConfidence::Confirmed),
-		identifiers: match &issue.advisory {
-    		Some(advisory) => {
-    		    vec![gitlab_security_report::VulnerabilityIdentifier {
-				    r#type: "RUSTSEC Advisory".to_string(),
-				    name:   advisory.id.clone(),
-				    value:  advisory.id.clone(),
-				    url:    Some(advisory.url.clone())
-			    }]
-		    }
-    		_ => Vec::new(),
-		},
+		identifiers: issue.advisory.as_ref()
+			.map(|v| gitlab_security_report::VulnerabilityIdentifier {
+				r#type: "RUSTSEC Advisory".to_string(),
+				name:   v.id.clone(),
+				value:  v.id.clone(),
+				url:    v.url.clone()
+			})
+			.into_iter()
+			.collect(),
 		location:   match ty {
 			gitlab_security_report::ScanType::DependencyScanning => gitlab_security_report::VulnerabilityLocation::DependencyScanning {
 				file:       None,
 				dependency: gitlab_security_report::VulnerabilityLocationDependency {
-					package:         Some(gitlab_security_report::VulnerabilityLocationDependencyPackage { name: issue.package.name.clone() }),
-					version:         Some(issue.package.version.clone()),
+					package:         issue.package.as_ref().map(|v| gitlab_security_report::VulnerabilityLocationDependencyPackage { name: v.name.clone() }),
+					version:         issue.package.as_ref().map(|v| v.version.clone()),
 					iid:             None,
 					direct:          None,
 					dependency_path: Vec::new()
@@ -430,8 +425,8 @@ Methods:  {}/{}
 			gitlab_security_report::ScanType::DependencyScanning => gitlab_security_report::VulnerabilityLocation::DependencyScanning {
 				file:       None,
 				dependency: gitlab_security_report::VulnerabilityLocationDependency {
-					package:         Some(gitlab_security_report::VulnerabilityLocationDependencyPackage { name: package.package.id.name.clone() }),
-					version:         Some(package.package.id.version.clone()),
+					package:         Some(gitlab_security_report::VulnerabilityLocationDependencyPackage { name: package.package.id.name }),
+					version:         Some(package.package.id.version),
 					iid:             None,
 					direct:          None,
 					dependency_path: Vec::new()
