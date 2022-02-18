@@ -66,8 +66,8 @@ pub struct SettingsVulnerabilities {
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct Issue {
 	pub kind:     Option<String>,
-	pub advisory: IssueAdvisory,
-	pub versions: IssueVersions,
+	pub advisory: Option<IssueAdvisory>,
+	pub versions: Option<IssueVersions>,
 	pub affected: Option<IssueAffected>,
 	pub package:  IssuePackage
 }
