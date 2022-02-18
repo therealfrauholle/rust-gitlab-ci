@@ -69,7 +69,7 @@ pub struct Issue {
 	pub advisory: Option<IssueAdvisory>,
 	pub versions: Option<IssueVersions>,
 	pub affected: Option<IssueAffected>,
-	pub package:  IssuePackage
+	pub package:  Option<IssuePackage>
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -86,7 +86,7 @@ pub struct IssueAdvisory {
 	pub keywords:      Vec<String>,
 	pub cvss:          Option<String>,
 	pub informational: Option<String>,
-	pub url:           String,
+	pub url:           Option<String>,
 	pub references:    Vec<String>,
 	pub withdrawn:     Option<String>
 }
