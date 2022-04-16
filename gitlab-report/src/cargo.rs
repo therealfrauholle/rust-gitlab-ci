@@ -47,6 +47,7 @@ pub struct CargoTestReportSuiteStarted {
 pub struct CargoTestReportSuiteOkOrFailed {
 	pub passed:        usize,
 	pub failed:        usize,
+	#[serde(default)]
 	pub allowed_fail:  usize,
 	pub ignored:       usize,
 	pub measured:      usize,
