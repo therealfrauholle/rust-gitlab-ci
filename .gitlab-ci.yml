@@ -29,3 +29,6 @@ build:
                 PROFILE: [ debug, release ]
                 TARGET: [ x86_64-unknown-linux-musl ]
                 CARGO_OPTS: [ "--workspace" ]
+
+release:crates:
+    extends: .release:crates

@@ -195,7 +195,7 @@ test:test:
             - allure-report/
         reports:
             junit: results.xml
-            cobertura: coverage.xml
+#            cobertura: coverage.xml
 
 test:bench:
     extends: .rust-default
