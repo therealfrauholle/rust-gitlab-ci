@@ -110,7 +110,7 @@ pub struct IssuePackage {
 	pub version:      String,
 	pub source:       String,
 	pub checksum:     String,
-	pub dependencies: Vec<IssuePackageDependency>,
+	pub dependencies: Option<Vec<IssuePackageDependency>>,
 	pub replace:      Option<String>
 }
 
