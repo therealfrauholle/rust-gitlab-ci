@@ -316,7 +316,7 @@ release:pages:
     before_script:
         - rustup --version && rustc --version && cargo --version && echo $RUSTFLAGS
     script:
-        - cargo publish --registry $CARGO_REGISTRY --token $CARGO_REGISTRY_TOKEN $CARGO_OPTS
+        - cargo publish --token $CARGO_REGISTRY_TOKEN $CARGO_OPTS
 
 .deploy:
     stage: deploy
