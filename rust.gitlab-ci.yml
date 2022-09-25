@@ -272,6 +272,7 @@ release:pages:
         GIT_STRATEGY: none
     rules:
         -   if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH || $CI_COMMIT_TAG
+        -   if: $CI_COMMIT_MESSAGE =~ /\/release/
     script:
         - mv target/doc public/
         - echo '<meta http-equiv="refresh" content="0; url={{ LIBRARY NAME }}">' > public/index.html
@@ -279,7 +280,7 @@ release:pages:
         paths:
             - public/
 
-release:gitlab:
+.release:gitlab:
     stage: release
     image: registry.gitlab.com/gitlab-org/release-cli:latest
     needs: [ "check:audit", "test:test" ]
@@ -288,6 +289,7 @@ release:gitlab:
     rules:
         -   if: $CI_COMMIT_TAG
             when: manual
+        -   if: $CI_COMMIT_MESSAGE =~ /\/release/
     script:
         - release-cli create
             --name $CI_COMMIT_TAG
@@ -310,6 +312,7 @@ release:gitlab:
     rules:
         -   if: $CI_COMMIT_TAG
             when: manual
+        -   if: $CI_COMMIT_MESSAGE =~ /\/release/
     before_script:
         - rustup --version && rustc --version && cargo --version && echo $RUSTFLAGS
     script:
