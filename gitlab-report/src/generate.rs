@@ -92,7 +92,7 @@ pub fn test_to_junit(
 							cargo::CargoTestReportTestEvent::Ok(_v) => None,
 							cargo::CargoTestReportTestEvent::Failed(v) => Some(junit::TestsuiteTestcaseStatus::Failure {
 								r#type:  "cargo test".to_string(),
-								message: v.stdout.unwrap_or_default()
+								system_output: v.stdout.unwrap_or_default()
 							}),
 							_ => unreachable!()
 						};

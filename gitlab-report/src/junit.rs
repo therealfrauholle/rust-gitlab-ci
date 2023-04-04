@@ -70,7 +70,11 @@ pub enum TestsuiteTestcaseStatus {
 	//Error(#[serde(flatten)] TestsuiteTestcaseErrorOrFailure),
 	//Failure(#[serde(flatten)] TestsuiteTestcaseErrorOrFailure)
 	Error { r#type:  String, message: String },
-	Failure { r#type:  String, message: String }
+	Failure { 
+        r#type: String,
+        #[serde(rename = "$value")]
+        system_output: String
+    }
 }
 
 //#[derive(Clone, Debug, Serialize)]
